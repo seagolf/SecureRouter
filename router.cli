@@ -1,0 +1,27 @@
+//show software version
+version
+
+//show black list
+show black list
+
+// add new device
+add new device <MACADDR:mac>
+
+//add a device to black list
+add <MACADDR:mac> to black list
+
+//remove a device from black list
+remove <MACADDR:mac> from black list
+
+//check latest version
+check latest version
+
+//upgrad
+upgrade
+
+//debug 
+debug level <LIST:info,warning,error:loglevel>
+
+//quit the application
+exit
+
