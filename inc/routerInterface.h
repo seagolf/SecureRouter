@@ -38,7 +38,7 @@ public:
     void Run();
     bool HandleQueryResponse(MemoryStruct getResponse);
 
-    bool UpdateIptables(std::string macAddr, std::string opCode);
+    bool UpdateIptables(std::string macAddr, int opCode);
 
     void ShowVersion();
     void ShowBlacklist();

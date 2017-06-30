@@ -65,7 +65,6 @@ void RouterInterface::Run()
 #endif
         
 
-
         //send http GET  and handle reponse message
         if (!SendQueryRequest(apMacAddr))
         {
@@ -137,6 +136,11 @@ bool RouterInterface::SendQueryRequest(string apMacAddr)
 
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Accept: */*");
+
+#ifdef DEBUG
+    curl_slist_append(headers, "Authorization:");
+
+#endif
 
     curl_easy_setopt(pCurl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(pCurl, CURLOPT_URL, url.c_str());
@@ -211,25 +215,25 @@ bool RouterInterface::HandleQueryResponse(MemoryStruct getResponse)
             cout << "iptables Entry:" << tableString << endl; 
         }
         std::size_t dashPosition = tableString.find("-");
-        string macAddr = tableString.substr(0, dashPosition);
+        string address = tableString.substr(0, dashPosition);
 
         if (fDebugLevel == DebugInfo)
         {
-            cout<< "---> mac: " << macAddr << endl;
+            cout<< "---> address: " << address << endl;
         }
 
-        string opCode= tableString.substr(dashPosition+1);
-        string operation = (opCode== "1") ? "ACCEPT":"DROP" ;
+        int opCode= stoi (tableString.substr(dashPosition+1));
+        //string operation = (opCode== "1") ? "ACCEPT":"DROP" ;
 
         if (fDebugLevel == DebugInfo)
         {
-            cout<< "---> action:" << operation << endl;
+            cout<< "---> action:" << opCode<< endl;
         }
 
-        if(! UpdateIptables(macAddr, operation))
+        if(! UpdateIptables(address, opCode))
 
         {
-            cout << " UpdateIptables failed: " << macAddr << " opCode: " << operation << endl;
+            cout << " UpdateIptables failed: " << address << " opCode: " << opCode << endl;
         
         }
 
@@ -388,7 +392,7 @@ bool RouterInterface::SendNewDevicePost(string devMacAddr)
     curl_easy_cleanup(pCurl);
 }
 
-bool RouterInterface::UpdateIptables(string macAddr, string opCode) 
+bool RouterInterface::UpdateIptables(string address, int opCode) 
 {
     fMutex.lock();
     ifstream iptablesFile;
@@ -399,24 +403,39 @@ bool RouterInterface::UpdateIptables(string macAddr, string opCode)
     bool bFound = false;
     bool bNeedUpdate = false;
 
+    string opStr = (opCode == 1) ? "ACCEPT" : "DROP";
     while (getline(iptablesFile, iptablesEntry))
 
     {
 
         //a exist device mac
-        if (string::npos != iptablesEntry.find(macAddr))
+        if (string::npos != iptablesEntry.find(address))
         {
             size_t actionPos = iptablesEntry.find("-j ");   
             if(string::npos != actionPos)
             {
                 actionPos +=3;
                 string prevAction = iptablesEntry.substr(actionPos);
+                
 
-                if(prevAction != opCode)
+                if(prevAction != opStr)
                 {
                     ostringstream replaceCmd;
-                    replaceCmd << "sudo iptables -C FORWARD -m mac --mac-source ";
-                    replaceCmd << macAddr << "-j " << opCode;
+                    if (opCode != 2)
+                    {
+                        replaceCmd << "sudo iptables -C FORWARD -m mac --mac-source ";
+                    }
+                    else if (opCode == 2)
+                    {
+                        replaceCmd << "sudo iptables -A INPUT -s";
+                    }
+
+                    else 
+                    {
+                        cout << "opCode Error" << endl;
+                        return false;
+                    }
+                    replaceCmd << address << "-j " << opStr;
 
                     if (fDebugLevel == DebugInfo)
                     {
@@ -458,7 +477,19 @@ bool RouterInterface::UpdateIptables(string macAddr, string opCode)
     if( !bFound )
     {
         ostringstream addNewEntry;
-        addNewEntry << "sudo iptables -A FORWARD -m mac --mac-source " << macAddr << " -j "  << opCode  << endl;
+
+        if (opCode != 2)
+        {
+            addNewEntry << "sudo iptables -A FORWARD -m mac --mac-source " << address << " -j ";
+        }
+        else
+        {
+        
+            addNewEntry << "sudo iptables -A INPUT -s " << address << " -j ";
+
+        }
+        
+        addNewEntry << opStr  << endl;
 
         system(addNewEntry.str().c_str());
 
@@ -586,7 +617,7 @@ extern "C"
         {
             cout << "mac Address: " << macAddr << endl;
         }
-        if (! RouterInterface::Instance()->UpdateIptables(macAddr, "DROP"))
+        if (! RouterInterface::Instance()->UpdateIptables(macAddr, 0))
         {
             cout << " AddDeviceToBlacklist failed " <<endl;
         
@@ -602,7 +633,7 @@ extern "C"
             cout << "mac Address: " << macAddr << endl;
         }
 
-        if (! RouterInterface::Instance()->UpdateIptables(macAddr, "ACCEPT"))
+        if (! RouterInterface::Instance()->UpdateIptables(macAddr, 1))
         {
             cout << " RemovesDeviceFromBlacklist failed " <<endl;
         
