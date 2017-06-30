@@ -215,12 +215,20 @@ bool RouterInterface::HandleQueryResponse(MemoryStruct getResponse)
             cout << "iptables Entry:" << tableString << endl; 
         }
         std::size_t dashPosition = tableString.find("-");
+        if( dashPosition == string::npos)
+        {
+            cout << "not a good entry" << endl;
+            return false;
+
+        }
+
         string address = tableString.substr(0, dashPosition);
 
         if (fDebugLevel == DebugInfo)
         {
             cout<< "---> address: " << address << endl;
         }
+
 
         int opCode= stoi (tableString.substr(dashPosition+1));
         //string operation = (opCode== "1") ? "ACCEPT":"DROP" ;
